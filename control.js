@@ -97,7 +97,32 @@ document.addEventListener('DOMContentLoaded',(e)=>{
         let goal_x = parseFloat(e.target[0].value);
         let goal_y = parseFloat(e.target[1].value);
         let goal_theta = parseFloat(e.target[2].value);
-        let euclidean_dist = (x,y) = (Math.sqrt(Math.pow((x-goal_x),2)+Math.pow((y-goal_y),2)))
-         
+        let tolerance = parseFloat(e.target[3].value);
+        let euclidean_dist = (x,y) = (Math.sqrt(Math.pow((x-pos_x),2)+Math.pow((y-pos_y),2)));
+        let steering_angle = (x,y) = (Math.atan(x-pos_x,y-pos_y));
+        let linear_vel = (x,y,constant=1.5) = (constant*euclidean_dist(x,y))
+        let angular_vel = (x,y,contant=6)=>(constant*(steering_angle(goal_x,goal_y)-pos_theta))
+        var twist = new ROSLIB.Message({
+            linear:{
+                x:0.0,
+                y:0.0,
+                z:0.0
+            },
+            angular:{
+                x:0.0,
+                y:0.0,
+                z:0.0
+            }
+        });
+        while(euclidean_dist(goal_x,goal_y)>=tolerance){
+            twist.linear.x=linear_vel(goal_x,goal_y);
+            twist.angular.z=angular_vel(goal_x,goal_y);
+            cmdVel.publish(twist);
+        }
+
+        twist.linear.x=0;
+        twist.angular.z=0;
+        cmdVel.publish(twist)
+
     })
 });

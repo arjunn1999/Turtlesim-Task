@@ -1,0 +1,23 @@
+
+.navButtons{
+  width:500px;
+  height:200px;
+  margin-left: 100px;
+}
+.dir{
+  width: 100px;
+  height: 100px;
+}
+#front{
+  margin-left:102px;
+}
+
+
+
+#data{
+  width:500px;
+  height: 120px;
+  border:1px solid black;
+  margin-left:10px;
+  margin-bottom: 10px;
+}

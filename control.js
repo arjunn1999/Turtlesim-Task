@@ -1,8 +1,8 @@
 document.addEventListener('DOMContentLoaded',(e)=>{
     e.preventDefault();
-    var pos_x = 0
-    var pos_y = 0
-    var pos_theta=0
+    let  pos_x = 0
+    let pos_y = 0
+    let pos_theta=0
     var ros = new ROSLIB.Ros({
         url:'ws://localhost:9090'
     });
@@ -85,9 +85,7 @@ document.addEventListener('DOMContentLoaded',(e)=>{
     });
 
     pose.subscribe((message)=>{
-        pos_x=parseFloat(message['x'])
-        pos_y=parseFloat(message['y'])
-        pos_theta = parseFloat(message['theta'])
+       
         let s=`x:${message['x']}\ny:${message['y']}\ntheta:${message['theta']}\nlinear velocity:${message['linear_velocity']}\nangular velocity:${message['angular_velocity']}`;
         document.getElementById('data').innerText=s
 
@@ -98,10 +96,16 @@ document.addEventListener('DOMContentLoaded',(e)=>{
         let goal_y = parseFloat(e.target[1].value);
         let goal_theta = parseFloat(e.target[2].value);
         let tolerance = parseFloat(e.target[3].value);
-        let euclidean_dist = (x,y) = (Math.sqrt(Math.pow((x-pos_x),2)+Math.pow((y-pos_y),2)));
-        let steering_angle = (x,y) = (Math.atan(x-pos_x,y-pos_y));
-        let linear_vel = (x,y,constant=1.5) = (constant*euclidean_dist(x,y))
-        let angular_vel = (x,y,contant=6)=>(constant*(steering_angle(goal_x,goal_y)-pos_theta))
+
+        let euclidean_dist = (x,y) => (Math.sqrt(Math.pow((x-pos_x),2)+Math.pow((y-pos_y),2)));
+        let steering_angle = (x,y) => (Math.atan(x-pos_x,y-pos_y));
+        let linear_vel = (x,y,constant=0.5) => (constant*euclidean_dist(x,y))
+        let angular_vel = (x,y,constant=0.2)=>(constant*(steering_angle(x,y)-pos_theta))
+        var cmdVel_1 = new ROSLIB.Topic({
+            ros:ros,
+            name:'/turtle1/cmd_vel',
+            messageType:'geometry_msgs/Twist'
+        });
         var twist = new ROSLIB.Message({
             linear:{
                 x:0.0,
@@ -114,15 +118,32 @@ document.addEventListener('DOMContentLoaded',(e)=>{
                 z:0.0
             }
         });
-        while(euclidean_dist(goal_x,goal_y)>=tolerance){
-            twist.linear.x=linear_vel(goal_x,goal_y);
-            twist.angular.z=angular_vel(goal_x,goal_y);
-            cmdVel.publish(twist);
-        }
-
-        twist.linear.x=0;
-        twist.angular.z=0;
-        cmdVel.publish(twist)
+        var pos = new ROSLIB.Topic({
+            ros:ros,
+            name:'/turtle1/pose',
+            messageType:'turtlesim/Pose'
+        });
+        pos.subscribe((message)=>{
+            pos_x=parseFloat(message['x'])
+            pos_y=parseFloat(message['y'])
+            if(euclidean_dist(goal_x,goal_y)>=tolerance){
+                twist.linear.x=linear_vel(goal_x,goal_y);
+                twist.angular.z=angular_vel(goal_x,goal_y);
+                cmdVel_1.publish(twist);
+                console.log(pos_x,pos_y)
+    
+                setTimeout(()=>{},20000)
+            }
+            else{
+            twist.linear.x=0;
+            twist.angular.z=0;
+            cmdVel_1.publish(twist)
+            pos.unsubscribe();
+            }
+        });
+       
+        
+        
 
     })
 });

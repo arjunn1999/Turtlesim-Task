@@ -1,3 +1,69 @@
+class TurtleBot{
+    constructor(ros){
+      
+        this.velocity_pub=new ROSLIB.Topic({
+        ros:ros,
+        name:'/turtle1/cmd_vel',
+        messageType:'geometry_msgs/Twist'
+        })
+        this.pose = new ROSLIB.Topic({
+            ros:ros,
+            name:'/turtle1/pose',
+            messageType:'turtlesim/Pose'
+        });
+        this.pose_x=0;
+        this.pose_y=0;
+        this.pose_z=0;
+        this.pose.subscribe(this.update_pos);
+        this.twist = new ROSLIB.Message({
+            linear:{
+                x:0,
+                y:0,
+                z:0
+            },
+            angular:{
+                x:0,
+                y:0,
+                z:0
+            }
+        });
+    }
+    update_pos(data) {
+        this.pose_x=parseFloat(data['x']);
+        this.pose_y=parseFloat(data['y']);
+        this.pose_theta=parseFloat(data['theta']);
+    }
+    euclidean_dist(goal_x,goal_y){
+        let dist = Math.sqrt(Math.pow(goal_x-this.pose_x,2)+Math.pow(goal_y-this.pose_y,2));
+        return dist;
+    }
+    linear_vel(goal_x,goal_y,c=1.5){
+        let linear_vel=c*this.euclidean_dist(goal_x,goal_y);
+    }
+    steering_angle(goal_x,goal_y){
+        let angle = Math.atan(goal_x-this.pose_x,goal_y-this.goal_y);
+        return angle
+    }
+    angular_vel(goal_x,goal_y,c=6){
+        return c*(this.steering_angle(goal_x,goal_y)-this.pose_theta)
+    }
+
+    move2Pos(goal_x,goal_y,tolerance=0.5){
+        console.log(this.pose_x,this.pose_y)
+        while (this.euclidean_dist(goal_x,goal_y)>=tolerance){
+            this.twist.linear.x=this.linear_vel(goal_x,goal_y)
+            this.twist.angular.z=this.angular_vel(goal_x,goal_y);
+            this.velocity_pub.publish(this.twist)
+        }
+            this.twist.linear.x=0;
+            this.twist.angular.z=0
+            this.velocity_pub.publish(this.twist);
+    }
+
+
+}
+
+
 document.addEventListener('DOMContentLoaded',(e)=>{
     e.preventDefault();
     let  pos_x = 0
@@ -78,6 +144,7 @@ document.addEventListener('DOMContentLoaded',(e)=>{
         });
         cmdVel.publish(twist);
     });
+    
     var pose = new ROSLIB.Topic({
         ros:ros,
         name:'/turtle1/pose',
@@ -90,60 +157,28 @@ document.addEventListener('DOMContentLoaded',(e)=>{
         document.getElementById('data').innerText=s
 
     });
+    var turtlebot = new TurtleBot(ros);
     document.getElementById('location').addEventListener('submit',(e)=>{
         e.preventDefault();
         let goal_x = parseFloat(e.target[0].value);
         let goal_y = parseFloat(e.target[1].value);
-        let goal_theta = parseFloat(e.target[2].value);
-        let tolerance = parseFloat(e.target[3].value);
+        let tolerance = parseFloat(e.target[2].value);
+        console.log("Moving");
+        turtlebot.move2Pos(goal_x,goal_y,tolerance);
 
-        let euclidean_dist = (x,y) => (Math.sqrt(Math.pow((x-pos_x),2)+Math.pow((y-pos_y),2)));
-        let steering_angle = (x,y) => (Math.atan(x-pos_x,y-pos_y));
-        let linear_vel = (x,y,constant=0.5) => (constant*euclidean_dist(x,y))
-        let angular_vel = (x,y,constant=0.2)=>(constant*(steering_angle(x,y)-pos_theta))
-        var cmdVel_1 = new ROSLIB.Topic({
-            ros:ros,
-            name:'/turtle1/cmd_vel',
-            messageType:'geometry_msgs/Twist'
-        });
-        var twist = new ROSLIB.Message({
-            linear:{
-                x:0.0,
-                y:0.0,
-                z:0.0
-            },
-            angular:{
-                x:0.0,
-                y:0.0,
-                z:0.0
-            }
-        });
-        var pos = new ROSLIB.Topic({
-            ros:ros,
-            name:'/turtle1/pose',
-            messageType:'turtlesim/Pose'
-        });
-        pos.subscribe((message)=>{
-            pos_x=parseFloat(message['x'])
-            pos_y=parseFloat(message['y'])
-            if(euclidean_dist(goal_x,goal_y)>=tolerance){
-                twist.linear.x=linear_vel(goal_x,goal_y);
-                twist.angular.z=angular_vel(goal_x,goal_y);
-                cmdVel_1.publish(twist);
-                console.log(pos_x,pos_y)
     
-                setTimeout(()=>{},20000)
-            }
-            else{
-            twist.linear.x=0;
-            twist.angular.z=0;
-            cmdVel_1.publish(twist)
-            pos.unsubscribe();
-            }
+            
         });
-       
-        
-        
 
+
+    const rosout = new ROSLIB.Topic({
+        ros:ros,
+        name:'/rosout',
+        type:'rosgraph_msgs/Log'
+    });
+    rosout.subscribe((e)=>{
+        if(e['name']=='/turtlesim' && e['level']==4){
+            vNotify.error({text:e['msg'], title:'Error Notification.'});
+        }
     })
 });
